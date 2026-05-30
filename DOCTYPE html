@@ -1,0 +1,456 @@
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>RIIZE 单身即地狱 · 易培养版</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0b1a1f;
+      font-family: 'Georgia', 'Times New Roman', '宋体', '仿宋', '楷体', serif;
+      display: flex; justify-content: center; align-items: center;
+      min-height: 100vh; padding: 20px;
+      background-image: radial-gradient(circle at 20% 20%, #1e4b4b22, #000000);
+    }
+    .game-container {
+      max-width: 700px; width: 100%;
+      background: rgba(18, 32, 36, 0.85);
+      backdrop-filter: blur(18px); border-radius: 36px;
+      box-shadow: 0 30px 50px rgba(0,0,0,0.7), inset 0 1px 2px rgba(255,255,240,0.2);
+      padding: 28px 24px; color: #f3efe0;
+      border: 1px solid rgba(210, 180, 120, 0.3);
+    }
+    h1 {
+      font-size: 2.4rem; letter-spacing: 6px; text-align: center;
+      font-weight: 400; color: #e7d7b8; text-shadow: 0 4px 12px #00000050;
+      margin-bottom: 8px; border-bottom: 1px dashed #ad8b5f; padding-bottom: 12px;
+    }
+    .subtitle {
+      text-align: center; font-style: italic; color: #c0b090; margin-bottom: 24px;
+    }
+    .story-area {
+      background: #0c191e; border-radius: 24px; padding: 22px 18px;
+      min-height: 200px; max-height: 380px; overflow-y: auto;
+      margin-bottom: 22px; line-height: 1.7; font-size: 1.05rem;
+      border: 1px solid #4b5c4e; box-shadow: inset 0 0 25px #00000040;
+      white-space: pre-wrap; word-break: break-word; scroll-behavior: smooth;
+    }
+    .choices {
+      display: flex; flex-direction: column; gap: 12px; margin: 18px 0 18px;
+    }
+    .choice-btn {
+      background: #1e3a35; border: 1px solid #8b7a5c; color: #f7efdb;
+      padding: 14px 18px; border-radius: 60px; font-size: 1.05rem;
+      cursor: pointer; transition: all 0.2s ease; text-align: left;
+      display: flex; align-items: center; gap: 12px;
+      backdrop-filter: blur(5px); letter-spacing: 0.5px;
+    }
+    .choice-btn:hover {
+      background: #2e5548; border-color: #cbb286; color: #ffffff;
+      box-shadow: 0 0 18px #b4945a55; transform: translateY(-1px);
+    }
+    .choice-btn:active { background: #15362d; }
+    .status-panel {
+      display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between;
+      background: #0f1f1c; padding: 14px 18px; border-radius: 30px;
+      margin: 16px 0 8px; font-size: 0.9rem; border: 1px solid #4b5c44;
+    }
+    .stat-item { display: flex; align-items: baseline; gap: 5px; }
+    .stat-label { color: #b7a77a; text-transform: uppercase; font-size: 0.7rem; }
+    .reset-btn {
+      background: transparent; border: 1px solid #695d48; color: #cfc3a6;
+      padding: 8px 18px; border-radius: 30px; margin-top: 10px;
+      cursor: pointer; font-size: 0.9rem; transition: 0.2s;
+    }
+    .reset-btn:hover { background: #3b3324; color: #f5e7c6; }
+    .input-group { display: flex; flex-direction: column; gap: 8px; margin: 18px 0; }
+    .input-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    input, select {
+      background: #172925; border: 1px solid #5e5a44; padding: 10px 14px;
+      border-radius: 30px; color: #ece3cc; font-family: inherit; flex: 1;
+    }
+    .small-btn {
+      background: #2b423a; border: none; color: #ebdfc2;
+      padding: 8px 16px; border-radius: 25px; cursor: pointer;
+    }
+    hr { border-color: #4a4a33; margin: 18px 0; }
+  </style>
+</head>
+<body>
+<div class="game-container">
+  <h1>🏝️ 单身即地狱</h1>
+  <div class="subtitle">RIIZE · 十天九夜 · 容易心动的恋爱</div>
+  <div id="storyBox" class="story-area">✨ 欢迎来到地狱岛。请先设定你的身份。</div>
+  <div id="choicesContainer" class="choices"></div>
+  <div id="statusDisplay" class="status-panel"></div>
+  <button id="resetGameBtn" class="reset-btn">🌙 重新开始</button>
+</div>
+
+<script>
+  (function() {
+    // ---------- 游戏核心状态 ----------
+    const GameState = {
+      day: 1,
+      phase: 'setup',
+      player: {
+        name: '', age: '', job: '', personality: '', hobbies: '', purpose: '', firstChoice: ''
+      },
+      maleGuests: [],
+      femaleGuests: [],
+      thirdDayArrivalMale: null,
+      sixthDayArrivalFemale: null,
+      previousPairedMale: null,
+      log: [],
+      lastEvent: ''
+    };
+
+    const maleBaseData = [
+      { name: 'Shotaro', age: 26, job: '陶艺工作室主理人', desc: '开朗亲和，笑容治愈，擅长观察情绪。' },
+      { name: 'Eunseok', age: 25, job: '律师', desc: '外冷内热，毒舌但可靠，保护欲强。' },
+      { name: 'Sungchan', age: 25, job: '体育老师', desc: '阳光直率，运动全能，笨拙示好。' },
+      { name: 'Wonbin', age: 24, job: '独立摄影师', desc: '清冷文艺，默默拍照，细节温柔。' },
+      { name: 'Sohee', age: 23, job: '独立音乐人', desc: '嗓音治愈，直白吃醋，活泼粘人。' },
+      { name: 'Anton', age: 22, job: '游泳运动员', desc: '优雅慢热，用行动关心，喜欢可爱事物。' }
+    ];
+
+    const femaleNames = ['Yuna', 'Hana', 'Jisoo', 'Minji', 'Chaewon'];
+
+    function randomFromArray(arr) {
+      return arr[Math.floor(Math.random() * arr.length)];
+    }
+
+    // 创建男主：初始好感50，信任30，契合20，容易培养
+    function createMaleGuest(base, isPresentFromDay1 = true) {
+      return {
+        ...base,
+        好感度: 50,
+        信任度: 30,
+        契合度: 20,
+        present: isPresentFromDay1,
+        pairedYesterday: false,
+      };
+    }
+
+    function resetGame() {
+      GameState.day = 1;
+      GameState.phase = 'setup';
+      GameState.player = {
+        name: '', age: '', job: '', personality: '', hobbies: '', purpose: '', firstChoice: ''
+      };
+      GameState.maleGuests = [];
+      GameState.femaleGuests = femaleNames.map(name => ({ name, present: true }));
+      GameState.thirdDayArrivalMale = null;
+      GameState.sixthDayArrivalFemale = null;
+      GameState.previousPairedMale = null;
+      GameState.log = [];
+      GameState.lastEvent = '';
+      document.getElementById('storyBox').innerHTML = '✨ 欢迎来到地狱岛。请先设定你的身份。';
+      renderSetupForm();
+    }
+
+    // ---------- UI 渲染 ----------
+    const storyBox = document.getElementById('storyBox');
+    const choicesDiv = document.getElementById('choicesContainer');
+    const statusDiv = document.getElementById('statusDisplay');
+
+    function updateStory(text) {
+      storyBox.innerHTML = text;
+      storyBox.scrollTop = storyBox.scrollHeight;
+    }
+
+    function clearChoices() { choicesDiv.innerHTML = ''; }
+
+    function setChoices(options) {
+      clearChoices();
+      options.forEach(opt => {
+        const btn = document.createElement('button');
+        btn.className = 'choice-btn';
+        btn.innerHTML = opt.label;
+        btn.addEventListener('click', opt.action);
+        choicesDiv.appendChild(btn);
+      });
+    }
+
+    function updateStatusPanel() {
+      if (GameState.phase === 'setup') {
+        statusDiv.innerHTML = `<span style="color:#b7a77a;">⚓ 准备登岛</span>`;
+        return;
+      }
+      const day = GameState.day;
+      const malePresent = GameState.maleGuests.filter(m => m.present);
+      let html = `<div class="stat-item"><span class="stat-label">📅 第${day}天</span></div>`;
+      html += `<div class="stat-item"><span class="stat-label">👥 男嘉宾</span> ${malePresent.length}/6</div>`;
+      if (GameState.previousPairedMale) {
+        html += `<div class="stat-item"><span class="stat-label">🔒 昨日配对</span> ${GameState.previousPairedMale}</div>`;
+      }
+      statusDiv.innerHTML = html;
+    }
+
+    function showAffectionHint(male) {
+      return ` (好感${male.好感度})`;
+    }
+
+    // ---------- 设置界面 ----------
+    function renderSetupForm() {
+      clearChoices();
+      let html = `
+        <div class="input-group">
+          <input id="pName" placeholder="你的姓名" value="素希">
+          <input id="pAge" placeholder="年龄" value="24">
+          <input id="pJob" placeholder="职业" value="插画师">
+          <input id="pPersonality" placeholder="性格" value="温柔内向但坚定">
+          <input id="pHobbies" placeholder="兴趣爱好" value="画画、海边散步、看日落">
+          <select id="pPurpose">
+            <option value="恋爱">💘 恋爱</option>
+            <option value="交友">🤝 交友</option>
+            <option value="体验生活">🌿 体验生活</option>
+            <option value="挑战自我">🔥 挑战自我</option>
+          </select>
+          <label style="color:#cbb286;">🌟 第一顺位男主 (第一天必出现)</label>
+          <select id="firstChoiceSelect">
+            ${maleBaseData.map(m => `<option value="${m.name}">${m.name} - ${m.job}</option>`).join('')}
+          </select>
+          <button id="startGameBtn" class="small-btn" style="margin-top:12px;">🏝️ 登上海岛</button>
+        </div>
+      `;
+      choicesDiv.innerHTML = html;
+      document.getElementById('startGameBtn').addEventListener('click', () => {
+        const name = document.getElementById('pName').value.trim();
+        if (!name) { alert('请输入姓名'); return; }
+        GameState.player.name = name;
+        GameState.player.age = document.getElementById('pAge').value.trim();
+        GameState.player.job = document.getElementById('pJob').value.trim();
+        GameState.player.personality = document.getElementById('pPersonality').value.trim();
+        GameState.player.hobbies = document.getElementById('pHobbies').value.trim();
+        GameState.player.purpose = document.getElementById('pPurpose').value;
+        GameState.player.firstChoice = document.getElementById('firstChoiceSelect').value;
+        startGameAfterSetup();
+      });
+    }
+
+    function startGameAfterSetup() {
+      const firstChoiceName = GameState.player.firstChoice;
+      const otherMales = maleBaseData.filter(m => m.name !== firstChoiceName);
+      const thirdDayMaleBase = randomFromArray(otherMales);
+      GameState.thirdDayArrivalMale = thirdDayMaleBase.name;
+      const remaining = otherMales.filter(m => m.name !== thirdDayMaleBase.name);
+
+      const maleGuests = [];
+      maleGuests.push(createMaleGuest(maleBaseData.find(m => m.name === firstChoiceName), true));
+      remaining.forEach(base => maleGuests.push(createMaleGuest(base, true)));
+      maleGuests.push(createMaleGuest(thirdDayMaleBase, false));
+
+      GameState.maleGuests = maleGuests;
+      GameState.femaleGuests = femaleNames.slice(0, 4).map(name => ({ name, present: true }));
+      GameState.sixthDayArrivalFemale = femaleNames[4];
+
+      GameState.day = 1;
+      GameState.phase = 'morning';
+      GameState.previousPairedMale = null;
+      updateStatusPanel();
+      proceedToDayStart();
+    }
+
+    // ---------- 每日流程 ----------
+    function proceedToDayStart() {
+      const day = GameState.day;
+      if (day === 3 && GameState.thirdDayArrivalMale) {
+        const male = GameState.maleGuests.find(m => m.name === GameState.thirdDayArrivalMale);
+        if (male && !male.present) {
+          male.present = true;
+          updateStory(`🌅 第三天清晨，直升机降落，新男嘉宾${male.name}（${male.age}岁，${male.job}）空降地狱岛！\n他目光扫过众人，最后停在你身上，微微一笑。`);
+        }
+      }
+      if (day === 6 && GameState.sixthDayArrivalFemale) {
+        const femaleName = GameState.sixthDayArrivalFemale;
+        GameState.femaleGuests.push({ name: femaleName, present: true });
+        updateStory(`🪂 第六天午后，女嘉宾${femaleName}空降！气氛顿时变得微妙，但男嘉宾们的目光依然追随着你。`);
+      }
+
+      if (day === 10) {
+        startFinalConfession();
+        return;
+      }
+
+      let morningText = `🌞 第${day}天清晨，阳光洒在地狱岛上。`;
+      if (day === 1) morningText = `🏝️ 第一天，你与其他嘉宾踏上地狱岛。没有手机，只有木屋与海风。\n五位男嘉宾已在整理物资，${GameState.player.firstChoice}抬头对你笑了笑。`;
+      
+      updateStory(morningText + `\n\n你可以选择今天一起劳动的搭档。`);
+      renderDaytimeChoices();
+      updateStatusPanel();
+    }
+
+    function renderDaytimeChoices() {
+      const presentMales = GameState.maleGuests.filter(m => m.present);
+      const options = presentMales.map(male => ({
+        label: `🧑‍🌾 和 ${male.name} 一起拾柴/取水`,
+        action: () => chooseDayPartner(male)
+      }));
+      options.push({
+        label: `🍃 独自行动，安静观察`,
+        action: () => soloDaytime()
+      });
+      setChoices(options);
+    }
+
+    function chooseDayPartner(male) {
+      // 增加的好感度翻倍，更容易培养
+      male.好感度 += 10;
+      male.信任度 += 6;
+      male.契合度 += 5;
+      GameState.lastEvent = `你主动走到${male.name}身边，和他一起干活。他眼神温柔：“和你一起，效率都变高了。”`;
+      if (Math.random() < 0.5) {
+        male.好感度 += 5;
+        GameState.lastEvent += `\n${male.name}悄悄把摘到的椰子先递给了你。`;
+      }
+      updateStory(GameState.lastEvent);
+      proceedToGroupGame(male);
+    }
+
+    function soloDaytime() {
+      updateStory(`你独自在海边散步，享受片刻宁静。`);
+      if (Math.random() < 0.7) {
+        const present = GameState.maleGuests.filter(m => m.present);
+        const randomMale = randomFromArray(present);
+        randomMale.好感度 += 5;
+        updateStory(`你走着走着，${randomMale.name}追了上来：“一个人太孤单了，我陪你。”`);
+      }
+      proceedToGroupGame(null);
+    }
+
+    function proceedToGroupGame(partnerMale) {
+      updateStory(GameState.lastEvent + `\n\n🎲 午后团体小游戏：沙滩运水接力！`);
+      setChoices([
+        { label: `🏃‍♀️ 全力以赴争取胜利`, action: () => playGame(true, partnerMale) },
+        { label: `🎈 放松享受游戏乐趣`, action: () => playGame(false, partnerMale) }
+      ]);
+    }
+
+    function playGame(competitive, partnerMale) {
+      let bonus = 0;
+      if (competitive && Math.random() < 0.7) {
+        bonus = 15;
+        updateStory(`你们队赢了！获得丰盛食材大礼包。`);
+      } else {
+        updateStory(`游戏在欢声笑语中结束，大家心情都很愉悦。`);
+      }
+      if (partnerMale) {
+        partnerMale.好感度 += bonus > 0 ? 15 : 8;
+        partnerMale.信任度 += 10;
+        partnerMale.契合度 += 8;
+      } else {
+        const present = GameState.maleGuests.filter(m => m.present);
+        if (present.length) randomFromArray(present).好感度 += 5;
+      }
+      proceedToEveningVote();
+    }
+
+    function proceedToEveningVote() {
+      const day = GameState.day;
+      updateStory(`🌙 夜幕降临，心动信箱开启。请写下你今天的心动对象。\n(不能选择昨天同去天堂岛的人)`);
+      const presentMales = GameState.maleGuests.filter(m => m.present);
+      const forbidden = GameState.previousPairedMale;
+      const options = presentMales
+        .filter(male => male.name !== forbidden)
+        .map(male => ({
+          label: `💌 ${male.name} ${showAffectionHint(male)}`,
+          action: () => submitVote(male)
+        }));
+      if (options.length === 0) {
+        updateStory(`今日无可选对象，自动跳过配对。`);
+        proceedNightAlone();
+      } else {
+        setChoices(options);
+      }
+    }
+
+    function submitVote(chosenMale) {
+      // 核心改动：男主必定选择玩家（100%互选成功）
+      chosenMale.好感度 += 20;
+      chosenMale.信任度 += 15;
+      chosenMale.契合度 += 12;
+      GameState.previousPairedMale = chosenMale.name;
+      updateStory(`💞 心动配对成功！${chosenMale.name} 也毫不犹豫地选择了你。\n你们将一同前往天堂岛度过浪漫夜晚。`);
+      proceedToParadise(chosenMale);
+    }
+
+    function proceedToParadise(male) {
+      GameState.phase = 'paradise';
+      updateStory(`🚁 直升机将你和${male.name}带到天堂岛别墅。烛光晚餐、海景套房……\n规则解禁：可以自由坦白身份。`);
+      setChoices([
+        { label: `🍷 坦白自己的职业与过去`, action: () => paradiseDeepTalk(male, 'open') },
+        { label: `🌊 海边散步，聊兴趣爱好`, action: () => paradiseDeepTalk(male, 'light') },
+        { label: `🎵 依偎着听音乐，享受安静`, action: () => paradiseDeepTalk(male, 'romantic') }
+      ]);
+    }
+
+    function paradiseDeepTalk(male, style) {
+      male.好感度 += 30;
+      male.信任度 += 25;
+      male.契合度 += 20;
+      let desc = '';
+      if (style === 'open') {
+        desc = `你向${male.name}坦白了自己是${GameState.player.job}，分享了成长故事。他也真诚地讲述了自己的经历，两人距离迅速拉近。`;
+      } else if (style === 'light') {
+        desc = `你们赤脚走在沙滩上，聊着喜欢的音乐和电影，发现彼此品味惊人一致。`;
+      } else {
+        desc = `房间里放着柔和的爵士乐，你们靠得很近，${male.name}轻声说：“和你在一起，时间过得真快。”`;
+      }
+      updateStory(desc + `\n\n🌅 次日清晨，返回地狱岛。你们的关系已非常亲密。`);
+      proceedToNextDay();
+    }
+
+    function proceedNightAlone() {
+      updateStory(`🌌 今夜你独自留在地狱岛。`);
+      const otherSingles = GameState.maleGuests.filter(m => m.present && m.name !== GameState.previousPairedMale);
+      if (otherSingles.length && Math.random() < 0.8) {
+        const randomGuy = randomFromArray(otherSingles);
+        randomGuy.好感度 += 10;
+        updateStory(`${randomGuy.name}默默坐到你身旁：“我陪你聊聊天吧。”`);
+      }
+      proceedToNextDay();
+    }
+
+    function proceedToNextDay() {
+      GameState.day++;
+      if (GameState.day > 10) {
+        startFinalConfession();
+        return;
+      }
+      GameState.maleGuests.forEach(m => m.pairedYesterday = (m.name === GameState.previousPairedMale));
+      GameState.phase = 'morning';
+      proceedToDayStart();
+    }
+
+    function startFinalConfession() {
+      GameState.phase = 'final';
+      updateStory(`💌 第十天傍晚，终极告白。请选择你最终想告白的人。`);
+      const presentMales = GameState.maleGuests.filter(m => m.present);
+      setChoices(presentMales.map(male => ({
+        label: `❤️ 向 ${male.name} 告白 (好感${male.好感度})`,
+        action: () => finalConfess(male)
+      })));
+    }
+
+    function finalConfess(chosenMale) {
+      // 好感度极大概率已满500，必定双向
+      if (chosenMale.好感度 >= 500) {
+        updateStory(`🎉 双向奔赴！${chosenMale.name} 眼眶微红，走向你：“我的选择从来只有你。”\n你们紧紧相拥，达成专属恋爱结局。`);
+      } else {
+        // 几乎不会出现，但保留分支
+        updateStory(`🌸 ${chosenMale.name} 温柔地说：“虽然我们认识时间不长，但我想继续了解你。”\n美好延续，结局依然甜蜜。`);
+      }
+      clearChoices();
+      const resetBtn = document.createElement('button');
+      resetBtn.className = 'reset-btn';
+      resetBtn.textContent = '🔄 再玩一次';
+      resetBtn.addEventListener('click', resetGame);
+      choicesDiv.appendChild(resetBtn);
+    }
+
+    document.getElementById('resetGameBtn').addEventListener('click', resetGame);
+    resetGame();
+  })();
+</script>
+</body>
+</html>
