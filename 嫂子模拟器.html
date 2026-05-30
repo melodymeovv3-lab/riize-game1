@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover">
+  <title>韩娱嫂子模拟器 · RIIZE</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body {
+      background: #0d0b0a; font-family: 'Noto Serif SC', 'Georgia', '宋体', serif;
+      display: flex; justify-content: center; align-items: center;
+      min-height: 100vh; padding: 10px;
+      background-image: radial-gradient(circle at 25% 30%, #2a1e2833, #000);
+    }
+    .game-container {
+      width: 100%; max-width: 480px;
+      background: rgba(18, 14, 13, 0.92); backdrop-filter: blur(18px);
+      border-radius: 32px; box-shadow: 0 20px 40px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,240,220,0.1);
+      padding: 20px 16px; color: #e2d5c5;
+      border: 1px solid rgba(190, 150, 110, 0.35);
+      display: flex; flex-direction: column; max-height: 95vh;
+    }
+    h1 { font-size: 1.8rem; letter-spacing: 3px; text-align: center; font-weight: 400; color: #ddc0a0; text-shadow: 0 3px 10px #000; margin-bottom: 4px; }
+    .subtitle { text-align: center; font-style: italic; color: #b89a7a; margin-bottom: 16px; font-size: 0.8rem; }
+    .story-area {
+      background: #110d0b; border-radius: 20px; padding: 16px 14px;
+      min-height: 160px; max-height: 300px; overflow-y: auto;
+      margin-bottom: 12px; line-height: 1.6; font-size: 0.9rem;
+      border: 1px solid #4a3c32; box-shadow: inset 0 0 18px #00000050;
+      white-space: pre-wrap; word-break: break-word; scroll-behavior: smooth;
+    }
+    .choices { display: flex; flex-direction: column; gap: 8px; margin: 10px 0 14px; flex-shrink: 0; }
+    .choice-btn {
+      background: #231c17; border: 1px solid #7a6450; color: #f3e7d8;
+      padding: 11px 13px; border-radius: 30px; font-size: 0.9rem;
+      cursor: pointer; transition: 0.2s; text-align: left;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .choice-btn:hover { background: #3e3127; border-color: #caa87e; color: #fff; box-shadow: 0 0 12px #b4884a44; }
+    .status-panel {
+      display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between;
+      background: #17100d; padding: 10px 14px; border-radius: 24px;
+      margin: 8px 0 4px; font-size: 0.7rem; border: 1px solid #4d3e30;
+    }
+    .stat-item { display: flex; align-items: baseline; gap: 3px; }
+    .stat-label { color: #b89972; text-transform: uppercase; font-size: 0.6rem; font-weight: bold; }
+    .btn-group { display: flex; gap: 8px; margin-top: 6px; }
+    .action-btn {
+      background: transparent; border: 1px solid #5a493a; color: #cfbfa8;
+      padding: 6px 12px; border-radius: 20px; cursor: pointer; font-size: 0.75rem; transition: 0.2s;
+    }
+    .action-btn:hover { background: #2e231c; color: #f5e6ce; }
+    input, select, textarea {
+      background: #1b1410; border: 1px solid #5a4636; padding: 9px 12px;
+      border-radius: 20px; color: #ebdecc; font-family: inherit; font-size: 0.85rem; width: 100%;
+    }
+    textarea { resize: vertical; border-radius: 16px; }
+    .setup-grid { display: flex; flex-direction: column; gap: 8px; }
+    label { color: #c4aa84; font-size: 0.8rem; margin-top: 4px; }
+  </style>
+</head>
+<body>
+<div class="game-container">
+  <h1>🪑 韩娱嫂子模拟器</h1>
+  <div class="subtitle">RIIZE · 平行世界恋爱叙事</div>
+  <div id="storyBox" class="story-area">✨ 此游戏为同人平行世界虚构创作。<br>不代表现实艺人真实经历。</div>
+  <div id="choicesContainer" class="choices"></div>
+  <div id="statusDisplay" class="status-panel"></div>
+  <div class="btn-group">
+    <button id="saveBtn" class="action-btn">💾 保存</button>
+    <button id="resetBtn" class="action-btn">🔄 重开</button>
+  </div>
+</div>
+
+<script>
+(function() {
+  // ---------- 游戏核心状态 ----------
+  const GameState = {
+    week: 1,
+    phase: 'setup', // setup, playing, ending
+    player: {
+      name: '', age: 19, origin: '', // A-I
+      customOrigin: '',
+      maleChoice: '', // 男主英文名
+      fanLevel: '',   // ①-⑤
+      pace: '',       // ①-⑤
+      structure: ''   // 起承转合偏好
+    },
+    attributes: {
+      affection: 0,       // 好感度 0-100
+      popularity: 0,      // 人气值
+      mood: 70,
+      money: 3000,
+      secrecy: 100,       // 恋情保密度
+      companyAlert: 20,   // 公司警觉度
+      careerStress: 55,   // 事业压力
+      youthBond: 5,       // 青春共鸣值
+      lifeStability: 50   // 生活稳定度
+    },
+    currentMale: null,    // 当前男主对象
+    relationshipStage: '陌生人',
+    narrativeArc: '起',
+    eventsLog: [],
+    npcs: [],
+    weekEventHistory: []
+  };
+
+  // 男主数据
+  const maleBase = [
+    { eng: 'Shotaro', chn: '大崎将太郎', full: '大崎将太郎（Shotaro）', role: '温柔节拍型', age: 24, desc: '舞蹈核心，异国温柔，细节守护。' },
+    { eng: 'Eunseok', chn: '宋银硕', full: '宋银硕（Eunseok）', role: '清冷反差型', age: 23, desc: '外冷内稳，慢热幽默，安静可靠。' },
+    { eng: 'Sungchan', chn: '郑成灿', full: '郑成灿（Sungchan）', role: '直球保护型', age: 23, desc: '高大直球，责任感，保护欲强。' },
+    { eng: 'Wonbin', chn: '朴元彬', full: '朴元彬（Wonbin）', role: '氛围舞台型', age: 22, desc: '舞台魅力，敏感内敛，自我要求高。' },
+    { eng: 'Sohee', chn: '李炤熙', full: '李炤熙（Sohee）', role: '明亮治愈型', age: 21, desc: '清亮主唱，少年感，情绪感染力强。' },
+    { eng: 'Anton', chn: '李灿荣', full: '李灿荣（Anton）', role: '安静成长型', age: 20, desc: '年下感，音乐创作，温柔笨拙。' }
+  ];
+
+  // 身份选项
+  const origins = [
+    { id: 'A', text: '留学生', desc: '首尔读书，与娱乐圈无关。' },
+    { id: 'B', text: '布栗子/海外粉丝', desc: '默默关注RIIZE很久。' },
+    { id: 'C', text: '娱乐公司实习生', desc: '经纪公司实习，禁止私联。' },
+    { id: 'D', text: '音乐节目工作人员', desc: '打歌节目、年末舞台幕后。' },
+    { id: 'E', text: '造型/妆发助理', desc: '舞台妆造、杂志拍摄。' },
+    { id: 'F', text: '翻译/海外商务助理', desc: '采访翻译、巡演随行。' },
+    { id: 'G', text: '校园文化活动志愿者', desc: '大学校园祭、快闪活动。' },
+    { id: 'H', text: '咖啡店/便利店兼职生', desc: '普通人，首尔生活奔波。' },
+    { id: 'I', text: '自定义身份', desc: '自行设定初遇契机。' }
+  ];
+
+  // ---------- UI 函数 ----------
+  const storyBox = document.getElementById('storyBox');
+  const choicesDiv = document.getElementById('choicesContainer');
+  const statusDiv = document.getElementById('statusDisplay');
+
+  function updateStory(text) {
+    storyBox.innerHTML = text;
+    storyBox.scrollTop = storyBox.scrollHeight;
+  }
+  function clearChoices() { choicesDiv.innerHTML = ''; }
+  function setChoices(opts) {
+    clearChoices();
+    opts.forEach(o => {
+      const btn = document.createElement('button');
+      btn.className = 'choice-btn';
+      btn.innerHTML = o.label;
+      btn.addEventListener('click', o.action);
+      choicesDiv.appendChild(btn);
+    });
+  }
+  function updateStatus() {
+    if (GameState.phase === 'setup') {
+      statusDiv.innerHTML = '<span style="color:#b89972;">🪑 角色创建中</span>';
+      return;
+    }
+    const a = GameState.attributes;
+    statusDiv.innerHTML = `
+      <div class="stat-item"><span class="stat-label">❤️好感</span>${a.affection}</div>
+      <div class="stat-item"><span class="stat-label">📈人气</span>${a.popularity}</div>
+      <div class="stat-item"><span class="stat-label">😊心情</span>${a.mood}</div>
+      <div class="stat-item"><span class="stat-label">💰钱</span>${a.money}</div>
+      <div class="stat-item"><span class="stat-label">🔒保密度</span>${a.secrecy}</div>
+      <div class="stat-item"><span class="stat-label">🏢公司警觉</span>${a.companyAlert}</div>
+      <div class="stat-item"><span class="stat-label">🎤事业压</span>${a.careerStress}</div>
+      <div class="stat-item"><span class="stat-label">🌟青春共鸣</span>${a.youthBond}</div>
+      <div class="stat-item"><span class="stat-label">🏠生活稳</span>${a.lifeStability}</div>
+    `;
+  }
+  function saveGame() {
+    localStorage.setItem('riize_sister_save', JSON.stringify(GameState));
+    alert('进度已保存。');
+  }
+  function loadGame() {
+    const saved = localStorage.getItem('riize_sister_save');
+    if (saved) {
+      try {
+        const obj = JSON.parse(saved);
+        Object.assign(GameState, obj);
+        updateStatus();
+        return true;
+      } catch(e) {}
+    }
+    return false;
+  }
+  document.getElementById('saveBtn').addEventListener('click', saveGame);
+  document.getElementById('resetBtn').addEventListener('click', ()=>{
+    if(confirm('确定重新开始吗？')) resetGame();
+  });
+
+  function resetGame() {
+    GameState.week = 1;
+    GameState.phase = 'setup';
+    GameState.player = { name:'', age:19, origin:'', customOrigin:'', maleChoice:'', fanLevel:'', pace:'', structure:'' };
+    GameState.attributes = { affection:0, popularity:0, mood:70, money:3000, secrecy:100, companyAlert:20, careerStress:55, youthBond:5, lifeStability:50 };
+    GameState.currentMale = null;
+    GameState.relationshipStage = '陌生人';
+    GameState.narrativeArc = '起';
+    GameState.eventsLog = [];
+    GameState.npcs = [];
+    GameState.weekEventHistory = [];
+    updateStory('✨ 此游戏为同人平行世界虚构创作。\n不代表现实艺人真实经历。');
+    clearChoices();
+    renderSetup();
+  }
+
+  // ---------- 角色创建 ----------
+  function renderSetup() {
+    let html = `
+      <div class="setup-grid">
+        <input id="pName" placeholder="你的姓名" value="77">
+        <input id="pAge" type="number" placeholder="年龄" value="19">
+        <label>📌 身份起源</label>
+        <select id="pOrigin">${origins.map(o=>`<option value="${o.id}">${o.id}. ${o.text}</option>`).join('')}</select>
+        <input id="pCustomOrigin" placeholder="自定义身份(若选I请填写)">
+        <label>🧑‍🎤 选择男主</label>
+        <select id="pMale">${maleBase.map(m=>`<option value="${m.eng}">${m.full} - ${m.role}</option>`).join('')}</select>
+        <label>🔍 追星程度</label>
+        <select id="pFan"> <option value="①">① 布栗子老粉</option><option value="②">② 普通韩娱瓜众</option><option value="③">③ 纯路人无感</option><option value="④">④ 曾经关注重新遇见</option><option value="⑤">⑤ 只喜欢某一位成员</option> </select>
+        <label>⏳ 剧情节奏</label>
+        <select id="pPace"> <option value="①">① 慢热现实向</option><option value="②">② 标准韩剧向</option><option value="③">③ 高压舆论向</option><option value="④">④ 青春成长向</option><option value="⑤">⑤ 都市群像向</option> </select>
+        <label>📖 起承转合偏好</label>
+        <select id="pStructure"> <option value="起承转合">起承转合标准</option> </select>
+        <button id="startBtn" class="action-btn" style="margin-top:8px;">✨ 开始游戏</button>
+      </div>`;
+    choicesDiv.innerHTML = html;
+    document.getElementById('startBtn').addEventListener('click', ()=>{
+      const name = document.getElementById('pName').value.trim();
+      if(!name) { alert('请输入姓名'); return; }
+      GameState.player.name = name;
+      GameState.player.age = parseInt(document.getElementById('pAge').value) || 19;
+      GameState.player.origin = document.getElementById('pOrigin').value;
+      GameState.player.customOrigin = document.getElementById('pCustomOrigin').value;
+      GameState.player.maleChoice = document.getElementById('pMale').value;
+      GameState.player.fanLevel = document.getElementById('pFan').value;
+      GameState.player.pace = document.getElementById('pPace').value;
+      GameState.player.structure = document.getElementById('pStructure').value;
+      // 设置男主对象
+      const maleData = maleBase.find(m=>m.eng===GameState.player.maleChoice);
+      GameState.currentMale = {
+        ...maleData,
+        affection: 0, secrecy: 100, stress: 55
+      };
+      // 初始化属性随机微调
+      GameState.attributes.money = Math.floor(Math.random()*4000)+2000;
+      GameState.attributes.companyAlert = Math.floor(Math.random()*30)+10;
+      GameState.attributes.careerStress = Math.floor(Math.random()*40)+40;
+      GameState.attributes.lifeStability = Math.floor(Math.random()*50)+30;
+      GameState.phase = 'playing';
+      GameState.week = 1;
+      GameState.narrativeArc = '起';
+      GameState.relationshipStage = '陌生人';
+      updateStatus();
+      proceedToWeek();
+    });
+  }
+
+  // ---------- 每周推进 ----------
+  function proceedToWeek() {
+    const w = GameState.week;
+    if (w > 36) { triggerEnding(); return; }
+    // 阶段判定
+    if (w <= 6) GameState.narrativeArc = '起';
+    else if (w <= 14) GameState.narrativeArc = '承';
+    else if (w <= 24) GameState.narrativeArc = '转';
+    else GameState.narrativeArc = '合';
+
+    // 关系阶段
+    const aff = GameState.attributes.affection;
+    if (aff <= 15) GameState.relationshipStage = '陌生人';
+    else if (aff <= 30) GameState.relationshipStage = '有印象';
+    else if (aff <= 50) GameState.relationshipStage = '产生兴趣';
+    else if (aff <= 65) GameState.relationshipStage = '暧昧期';
+    else if (aff <= 80) GameState.relationshipStage = '确认关系';
+    else if (aff <= 90) GameState.relationshipStage = '热恋期';
+    else GameState.relationshipStage = '考验期';
+
+    updateStatus();
+    generateWeeklyEvent();
+  }
+
+  function generateWeeklyEvent() {
+    const male = GameState.currentMale;
+    // 根据阶段与随机选择事件模板
+    const events = selectEvents();
+    const event = events[0]; // 取一个主要事件
+    let story = `📅 第${GameState.week}周 | ${GameState.narrativeArc}段\n`;
+    story += `📍 ${event.scene}\n`;
+    story += `👤 ${male.full}\n`;
+    story += `❤️ 关系：${GameState.relationshipStage}\n\n`;
+    story += event.text;
+    updateStory(story);
+    setChoices(event.options.map(opt => ({
+      label: opt.label,
+      action: ()=> applyChoice(opt)
+    })));
+  }
+
+  function selectEvents() {
+    const arc = GameState.narrativeArc;
+    const stage = GameState.relationshipStage;
+    // 简化事件池
+    const pool = [];
+    if (arc === '起') {
+      pool.push({
+        scene: '音乐节目侧门',
+        text: '清晨雨中，你抱着资料箱差点滑倒。他（男主）从保姆车下来，帮你按住通行证，低声提醒“地上有线”。经纪人皱眉，他迅速离开。',
+        options: [
+          { label: 'A. 低头继续工作', effect: { lifeStability: 3, companyAlert: -1 } },
+          { label: 'B. 小声道谢', effect: { affection: 2, mood: 3, companyAlert: 1 } },
+          { label: 'C. 记住他的名字', effect: { youthBond: 2, mood: 1 } },
+          { label: 'D. 自由行动(输入)', effect: {} }
+        ]
+      });
+    } else if (arc === '承') {
+      pool.push({
+        scene: '练习室楼下',
+        text: '你因工作送文件，碰见他独自练习后出来。他认出你，犹豫了一下问：“上次没来得及说，你是新来的工作人员？”',
+        options: [
+          { label: 'A. 诚实回答身份', effect: { affection: 5, trust: 5, companyAlert: 2 } },
+          { label: 'B. 含糊带过', effect: { affection: 2, secrecy: 5 } },
+          { label: 'C. 反问他的近况', effect: { affection: 4, youthBond: 3 } }
+        ]
+      });
+    } else if (arc === '转') {
+      pool.push({
+        scene: '韩网论坛',
+        text: '有人发帖称“某成员近期频繁看手机，疑似恋爱”。公司开始内部排查。经纪人找你谈话。',
+        options: [
+          { label: 'A. 否认关系', effect: { secrecy: 10, companyAlert: -5, mood: -5 } },
+          { label: 'B. 暂时减少联系', effect: { affection: -2, secrecy: 5 } },
+          { label: 'C. 坚持私下维持', effect: { affection: 5, secrecy: -10, companyAlert: 10 } }
+        ]
+      });
+    } else {
+      pool.push({
+        scene: '汉江边',
+        text: '你们在深夜短暂散步。他说：“如果有一天因为我的原因让你难过，你可以怪我。”',
+        options: [
+          { label: 'A. 告诉他你不后悔', effect: { affection: 8, youthBond: 5 } },
+          { label: 'B. 沉默不语', effect: { affection: 3, mood: -3 } },
+          { label: 'C. 问他的打算', effect: { affection: 6, secrecy: -2 } }
+        ]
+      });
+    }
+    return pool;
+  }
+
+  function applyChoice(option) {
+    const eff = option.effect;
+    const attr = GameState.attributes;
+    if (eff.affection) attr.affection = Math.min(100, Math.max(0, attr.affection + eff.affection));
+    if (eff.mood) attr.mood = Math.min(100, Math.max(0, attr.mood + eff.mood));
+    if (eff.secrecy) attr.secrecy = Math.min(100, Math.max(0, attr.secrecy + eff.secrecy));
+    if (eff.companyAlert) attr.companyAlert = Math.min(100, Math.max(0, attr.companyAlert + eff.companyAlert));
+    if (eff.careerStress) attr.careerStress = Math.min(100, Math.max(0, attr.careerStress + eff.careerStress));
+    if (eff.youthBond) attr.youthBond = Math.min(100, Math.max(0, attr.youthBond + eff.youthBond));
+    if (eff.lifeStability) attr.lifeStability = Math.min(100, Math.max(0, attr.lifeStability + eff.lifeStability));
+    if (eff.popularity) attr.popularity = Math.min(100, Math.max(0, attr.popularity + eff.popularity));
+    if (eff.money) attr.money = Math.max(0, attr.money + eff.money);
+    // 特殊检测
+    if (attr.mood < 20) updateStory('⚠️ 你的情绪濒临崩溃，独自在地铁站流泪。');
+    if (attr.secrecy < 30) updateStory('🚨 恋情保密度极低，媒体开始关注。');
+    GameState.week++;
+    proceedToWeek();
+  }
+
+  function triggerEnding() {
+    const aff = GameState.attributes.affection;
+    const sec = GameState.attributes.secrecy;
+    let endingText = '';
+    if (aff >= 90 && sec >= 60) endingText = '💫 HE：隐秘而稳定的爱。你们没有公开，但彼此守护。';
+    else if (aff >= 70) endingText = '🌙 OE：未公开的等待。他去巡演，你继续生活。';
+    else endingText = '🍂 BE：你们在舆论中走散，各自回到人海。';
+    updateStory(endingText + '\n\n感谢游玩《韩娱嫂子模拟器》。');
+    clearChoices();
+  }
+
+  // 启动
+  if (!loadGame()) {
+    resetGame();
+  } else {
+    updateStatus();
+    proceedToWeek();
+  }
+})();
+</script>
+</body>
+</html>
